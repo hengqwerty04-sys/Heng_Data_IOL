@@ -1,69 +1,66 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-from PIL import Image
 import io
-import time
+from datetime import datetime
 
-# បញ្ជាក់៖ យើងប្រកាស import easyocr នៅក្នុង Function វិញដើម្បីកុំឱ្យគាំង Server ពេលបើកដំបូង
-def get_reader():
-    import easyocr
-    return easyocr.Reader(['en']) # ប្រើ en ដើម្បីអានលេខ និងកូដ AHs ឱ្យបានលឿន
+st.set_page_config(page_title="Heng Data Entry", layout="wide")
 
-st.set_page_config(page_title="Heng OCR System", layout="wide")
-st.title("🚀 ប្រព័ន្ធស្កេន និងស្រង់ទិន្នន័យក្រដាសប៉ះពាល់")
+st.title("📋 ប្រព័ន្ធបញ្ចូលទិន្នន័យផលប៉ះពាល់ (Heng System)")
+st.markdown("---")
 
-# បង្កើត Sidebar សម្រាប់កំណត់ Rule
-with st.sidebar:
-    st.header("⚙️ ការកំណត់ (Rules)")
-    default_owner = st.text_input("ឈ្មោះម្ចាស់ (បើរកមិនឃើញ):", "ស៊ិន សុភ័ក្រ")
-    default_structure = st.selectbox("ប្រភេទសំណង់:", ["តូប", "ផ្ទះ", "រោង", "របង"])
+# បង្កើត Form សម្រាប់បញ្ចូលទិន្នន័យ
+with st.form("entry_form", clear_on_submit=True):
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        ahs_code = st.text_input("F (លេខ AHs):", placeholder="ឧទាហរណ៍: L770")
+        owner_name = st.text_input("J (ឈ្មោះម្ចាស់):", placeholder="ឧទាហរណ៍: ស៊ិន សុភ័ក្រ")
+        phone = st.text_input("Z (លេខទូរស័ព្ទ):", placeholder="097xxxxxxx")
+        poverty_card = st.selectbox("M (ប័ណ្ណក្រីក្រ):", ["ទេ", "មាន"])
 
-uploaded_files = st.file_uploader("📤 បញ្ចូលរូបថតក្រដាស (អាចដាក់ច្រើនសន្លឹក)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
+    with col2:
+        structure = st.selectbox("AV (ប្រភេទសំណង់):", ["តូប", "ផ្ទះ", "រោង", "របង", "ក្ងោក", "ដើមឈើ"])
+        roof = st.selectbox("AY (ដំបូល):", ["ស័ង្កសី", "ក្បឿង", "ស្បូវ", "បេតុង"], index=0)
+        wall = st.selectbox("AZ (ជញ្ជាំង):", ["ស័ង្កសី", "សុីម៉ង់ត៍", "ឈើ", "សាប"], index=0)
+        column = st.selectbox("BA (សសរ):", ["ដែក", "ថ្ម", "ឈើ"], index=0)
+        floor = st.selectbox("BB (កម្រាល):", ["សាប", "ការ៉ូ", "ដី"], index=0)
 
-if uploaded_files:
-    # ប៊ូតុងចាប់ផ្ដើមស្កេន
-    if st.button("🔍 ចាប់ផ្ដើមស្កេនទិន្នន័យ"):
-        reader = get_reader()
-        all_results = []
-        
-        progress_bar = st.progress(0)
-        for idx, file in enumerate(uploaded_files):
-            with st.spinner(f"កំពុងអានរូបភាពទី {idx+1}..."):
-                img = Image.open(file)
-                # ស្កេនអក្សរ
-                results = reader.readtext(np.array(img), detail=0)
-                full_text = " ".join(results).upper()
-                
-                # បង្កើត Row ទិន្នន័យ (F ដល់ CA)
-                row = {c: "" for c in "F J K L M X Y Z AM AW AN AP AQ AR AS AT AV AX AY AZ BA BB BK BL BM BN BO BW BX BY CA".split()}
-                
-                # --- ចាប់យកទិន្នន័យតាម Rule ---
-                row['J'] = default_owner
-                row['AV'] = default_structure
-                row['M'] = "ទេ" # ប័ណ្ណក្រីក្រ
-                
-                for t in results:
-                    t_up = t.upper()
-                    if "L" in t_up and any(c.isdigit() for c in t_up): row['F'] = t_up # AHs
-                    if any(c.isdigit() for c in t_up) and len(t_up) >= 9: row['Z'] = t_up # Phone
-                
-                # បំពេញសម្ភារៈសំណង់ (Default Rules)
-                row['AY'] = "ស័ង្កសី"
-                row['AZ'] = "ស័ង្កសី"
-                row['BA'] = "ដែក"
-                row['BB'] = "សាប"
-                row['រូបភាព'] = file.name
-                
-                all_results.append(row)
-                progress_bar.progress((idx + 1) / len(uploaded_files))
-        
-        df = pd.DataFrame(all_results)
-        st.success("✅ ស្កេនរួចរាល់!")
-        st.dataframe(df)
+    photo = st.file_uploader("📸 ថតរូប ឬ Upload ក្រដាស", type=['jpg', 'jpeg', 'png'])
+    
+    submit = st.form_submit_button("➕ បញ្ចូលទៅក្នុងតារាង")
 
-        # ប៊ូតុងទាញយក Excel
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False)
-        st.download_button("📥 ទាញយកជាហ្វាល Excel (.xlsx)", data=output.getvalue(), file_name="Heng_Data_Export.xlsx")
+# បង្កើតកន្លែងផ្ទុកទិន្នន័យបណ្ដោះអាសន្ន (Session State)
+if 'data_storage' not in st.session_state:
+    st.session_state.data_storage = []
+
+if submit:
+    new_entry = {
+        "F": ahs_code, "J": owner_name, "Z": phone, "M": poverty_card,
+        "AV": structure, "AY": roof, "AZ": wall, "BA": column, "BB": floor,
+        "កាលបរិច្ឆេទ": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "រូបភាព": photo.name if photo else "គ្មានរូបភាព"
+    }
+    st.session_state.data_storage.append(new_entry)
+    st.success("✅ បានរក្សាទុកទិន្នន័យម្ចាស់ឈ្មោះ: " + owner_name)
+
+# បង្ហាញតារាង និងប៊ូតុងទាញយក
+if st.session_state.data_storage:
+    st.markdown("### 📊 តារាងទិន្នន័យដែលបានបញ្ចូល")
+    df = pd.DataFrame(st.session_state.data_storage)
+    st.dataframe(df)
+
+    # ប៊ូតុងទាញយក Excel
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    
+    st.download_button(
+        label="📥 ទាញយកជាហ្វាល Excel (.xlsx)",
+        data=output.getvalue(),
+        file_name=f"Heng_Data_{datetime.now().strftime('%d_%m_%Y')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    if st.button("🗑 លុបតារាងចោល (Clear All)"):
+        st.session_state.data_storage = []
+        st.rerun()
