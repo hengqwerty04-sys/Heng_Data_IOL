@@ -13,7 +13,7 @@ st.title("🚀 ប្រព័ន្ធស្រង់ទិន្នន័យ�
 @st.cache_resource
 def load_ocr():
     # 'kh' សម្រាប់ខ្មែរ, 'en' សម្រាប់អង់គ្លេស/លេខ
-    return easyocr.Reader(['kh', 'en'])
+    return easyocr.Reader(['km', 'en'])
 
 reader = load_ocr()
 
