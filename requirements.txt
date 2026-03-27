@@ -1,7 +1,5 @@
 streamlit
 easyocr
 pandas
-pillow
-numpy
 openpyxl
 opencv-python-headless
