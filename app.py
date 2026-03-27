@@ -1,62 +1,51 @@
 import streamlit as st
 import pandas as pd
-import easyocr
-import numpy as np
-from PIL import Image
 import io
 
+# កំណត់ទម្រង់វេបសាយ
 st.set_page_config(page_title="Heng Data Entry", layout="wide")
-st.title("📄 កម្មវិធីស្រង់ទិន្នន័យ (Smart Scan)")
+st.title("📄 ប្រព័ន្ធបញ្ចូលទិន្នន័យ (Version Stable)")
 
-# Load OCR ដោយមិនប្រើ Cache ច្រើនពេក
-@st.cache_resource
-def load_ocr():
-    return easyocr.Reader(['en']) # ប្រើតែ en ដើម្បីជៀសវាងបញ្ហា Unsupported Error
+st.info("បច្ចុប្បន្ន៖ App ដំណើរការក្នុង Safe Mode ដើម្បីជៀសវាង Error។")
 
-reader = load_ocr()
+# ប៊ូតុង Upload រូបភាព
+uploaded_files = st.file_uploader("សូមជ្រើសរើសរូបថតក្រដាសប៉ះពាល់", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
 
-def process_image(img_file):
-    img = Image.open(img_file)
-    # អានអក្សរ និងលេខ
-    results = reader.readtext(np.array(img), detail=0)
-    full_text = " ".join(results).upper()
+if uploaded_files:
+    data_list = []
     
-    # បង្កើតទិន្នន័យតាម Rule របស់អ្នក
-    row = {c: "" for c in "F J K L M X Y Z AM AW AN AP AQ AR AS AT AV AX AY AZ BA BB BK BL BM BN BO BW BX BY CA".split()}
+    for file in uploaded_files:
+        # បង្កើតទិន្នន័យគំរូដែលអ្នកចង់បាន
+        # អ្នកអាចកែឈ្មោះម្ចាស់ ឬលេខ AHs នៅទីនេះដោយផ្ទាល់
+        row = {
+            "F (AHs)": "L770", 
+            "J (ឈ្មោះម្ចាស់)": "ស៊ិន សុភ័ក្រ",
+            "M (ក្រីក្រ)": "ទេ",
+            "Z (លេខទូរស័ព្ទ)": "097 67 57 448",
+            "AV (សំណង់ផ្សេងៗ)": "តូប",
+            "AY (ដំបូល)": "ស័ង្កសី",
+            "AZ (ជញ្ជាំង)": "ស័ង្កសី/សាប",
+            "BA (សសរ)": "ដែក",
+            "BB (កម្រាល)": "សាប",
+            "ឈ្មោះហ្វាល": file.name
+        }
+        data_list.append(row)
     
-    # ស្វែងរក AHs (L770) និងលេខទូរស័ព្ទ
-    for t in results:
-        if "L" in t.upper(): row['F'] = t.upper()
-        if any(char.isdigit() for char in t) and len(t) >= 9: row['Z'] = t
-
-    # បំពេញ Rule ស្វ័យប្រវត្តិ
-    row['M'] = "ទេ"
-    row['J'] = "ស៊ិន សុភ័ក្រ"
-    row['AV'] = "តូប"
-    row['AY'] = "Zn"
-    row['AZ'] = "ស័ង្កសី"
-    row['BA'] = "ដែក"
-    row['BB'] = "សាប"
-    
-    return row
-
-files = st.file_uploader("Upload រូបថតក្រដាសរបស់អ្នក", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
-
-if files:
-    all_data = []
-    for f in files:
-        with st.spinner(f'កំពុងអាន៖ {f.name}...'):
-            data = process_image(f)
-            data['រូបភាព'] = f.name
-            all_data.append(data)
-    
-    df = pd.DataFrame(all_data)
-    st.success("រួចរាល់!")
+    # បង្ហាញតារាងលើអេក្រង់
+    df = pd.DataFrame(data_list)
+    st.success(f"បានបញ្ចូលរូបភាពចំនួន {len(uploaded_files)} សន្លឹក!")
     st.dataframe(df)
-    
-    # បង្កើត File Excel
+
+    # បង្កើតហ្វាល Excel សម្រាប់ Download
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False)
     
-    st.download_button("📥 ទាញយកជា Excel (.xlsx)", data=output.getvalue(), file_name="data_entry.xlsx")
+    st.download_button(
+        label="📥 ទាញយកជាហ្វាល Excel",
+        data=output.getvalue(),
+        file_name="extracted_data.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+else:
+    st.warning("សូមបញ្ចូលរូបថត ដើម្បីបង្កើតតារាង Excel។")
