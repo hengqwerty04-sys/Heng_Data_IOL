@@ -1,7 +1,0 @@
-streamlit
-pandas
-easyocr
-pillow
-numpy
-openpyxl
-opencv-python-headless
