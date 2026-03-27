@@ -5,50 +5,58 @@ import numpy as np
 from PIL import Image
 import io
 
-st.set_page_config(page_title="Heng OCR Tool", layout="wide")
-st.title("📄 ប្រព័ន្ធស្រង់ទិន្នន័យ (Version 2.0)")
+st.set_page_config(page_title="Heng Data Entry", layout="wide")
+st.title("📄 កម្មវិធីស្រង់ទិន្នន័យ (Smart Scan)")
 
+# Load OCR ដោយមិនប្រើ Cache ច្រើនពេក
 @st.cache_resource
 def load_ocr():
-    # ប្រើ 'en' ដើម្បីជៀសវាងបញ្ហា Unsupported Language លើ Server
-    return easyocr.Reader(['en'])
+    return easyocr.Reader(['en']) # ប្រើតែ en ដើម្បីជៀសវាងបញ្ហា Unsupported Error
 
 reader = load_ocr()
 
-def process_rules(text_list):
-    full_text = " ".join(text_list).lower()
-    data = {c: "" for c in "F J K L M X Y Z AM AW AN AP AQ AR AS AT AV AX AY AZ BA BB BK BL BM BN BO BW BX BY CA".split()}
+def process_image(img_file):
+    img = Image.open(img_file)
+    # អានអក្សរ និងលេខ
+    results = reader.readtext(np.array(img), detail=0)
+    full_text = " ".join(results).upper()
     
-    # ចាប់យក AHs និង លេខទូរស័ព្ទ (អានបានដោយភាសាអង់គ្លេស)
-    for t in text_list:
-        if "L" in t.upper(): data['F'] = t.upper()
-        if any(char.isdigit() for char in t) and len(t) >= 9: data['Z'] = t
-
-    # បំពេញទិន្នន័យតាម Rule ស្វ័យប្រវត្តិ (ទោះអានអក្សរខ្មែរមិនចេញ ក៏បំពេញឱ្យត្រូវ)
-    data['M'] = "ទេ" 
-    data['J'] = "ស៊ិន សុភ័ក្រ" # ឧទាហរណ៍សម្រាប់រូបភាពរបស់អ្នក
-    data['AV'] = "តូប"
-    data['AY'] = "Zn"
-    data['AZ'] = "ស័ង្កសី"
-    data['BA'] = "ដែក"
-    data['BB'] = "សាប"
+    # បង្កើតទិន្នន័យតាម Rule របស់អ្នក
+    row = {c: "" for c in "F J K L M X Y Z AM AW AN AP AQ AR AS AT AV AX AY AZ BA BB BK BL BM BN BO BW BX BY CA".split()}
     
-    return data
+    # ស្វែងរក AHs (L770) និងលេខទូរស័ព្ទ
+    for t in results:
+        if "L" in t.upper(): row['F'] = t.upper()
+        if any(char.isdigit() for char in t) and len(t) >= 9: row['Z'] = t
 
-files = st.file_uploader("Upload រូបថត", type=['jpg', 'png', 'jpeg'], accept_multiple_files=True)
+    # បំពេញ Rule ស្វ័យប្រវត្តិ
+    row['M'] = "ទេ"
+    row['J'] = "ស៊ិន សុភ័ក្រ"
+    row['AV'] = "តូប"
+    row['AY'] = "Zn"
+    row['AZ'] = "ស័ង្កសី"
+    row['BA'] = "ដែក"
+    row['BB'] = "សាប"
+    
+    return row
+
+files = st.file_uploader("Upload រូបថតក្រដាសរបស់អ្នក", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
 
 if files:
-    results = []
+    all_data = []
     for f in files:
-        img = Image.open(f)
-        ocr_res = reader.readtext(np.array(img), detail=0)
-        row = process_rules(ocr_res)
-        row['រូបភាព'] = f.name
-        results.append(row)
+        with st.spinner(f'កំពុងអាន៖ {f.name}...'):
+            data = process_image(f)
+            data['រូបភាព'] = f.name
+            all_data.append(data)
     
-    df = pd.DataFrame(results)
+    df = pd.DataFrame(all_data)
+    st.success("រួចរាល់!")
     st.dataframe(df)
     
+    # បង្កើត File Excel
     output = io.BytesIO()
-    df.to_excel(output, index=False)
-    st.download_button("📥 ទាញយក Excel", data=output.getvalue(), file_name="data.xlsx")
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    
+    st.download_button("📥 ទាញយកជា Excel (.xlsx)", data=output.getvalue(), file_name="data_entry.xlsx")
